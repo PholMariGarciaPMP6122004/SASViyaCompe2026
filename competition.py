@@ -39,13 +39,10 @@ test = add_features(test)
 # ==========================================
 # PREPARE DATA
 # ==========================================
-drop_id_cols = ["ADMIT_LOS", "ENCOUNTER_KEY", "PATIENT_NUMBER", "DOCTOR", "DISCH_NURSE_ID"]
-
 y = train["ADMIT_LOS"]
-X = train.drop(columns=drop_id_cols).copy()
-
+X = train.drop(columns=["ADMIT_LOS", "ENCOUNTER_KEY"]).copy()
+X_test = test.drop(columns=["ENCOUNTER_KEY"]).copy()
 test_ids = test["ENCOUNTER_KEY"].copy()
-X_test = test.drop(columns=["ENCOUNTER_KEY", "PATIENT_NUMBER", "DOCTOR", "DISCH_NURSE_ID"]).copy()
 
 categorical_features = X.select_dtypes(include=["object"]).columns.tolist()
 numeric_features = X.select_dtypes(exclude=["object"]).columns.tolist()
@@ -69,15 +66,15 @@ preprocessor = ColumnTransformer(
 base_model = Pipeline(steps=[
     ("preprocessor", preprocessor),
     ("xgb", XGBRegressor(
-        n_estimators=1600,
-        learning_rate=0.025,
-        max_depth=5,
-        min_child_weight=8,
-        subsample=0.85,
-        colsample_bytree=0.75,
-        gamma=0.2,
-        reg_alpha=0.2,
-        reg_lambda=3.0,
+        n_estimators=1200,
+        learning_rate=0.03,
+        max_depth=6,
+        min_child_weight=5,
+        subsample=0.9,
+        colsample_bytree=0.85,
+        reg_alpha=0.0,
+        reg_lambda=2.0,
+        gamma=0.1,
         objective="reg:squarederror",
         tree_method="hist",
         random_state=42,
@@ -112,7 +109,6 @@ for fold, (train_idx, valid_idx) in enumerate(kf.split(X), 1):
     )
 
     fold_model.fit(X_train, y_train)
-
     pred_valid = fold_model.predict(X_valid)
     pred_valid = np.clip(pred_valid, 0, None)
 
@@ -131,6 +127,9 @@ overall_mae = mean_absolute_error(y, np.clip(oof_pred, 0, None))
 print("\nOverall CV RMSE:", overall_rmse)
 print("Overall CV MAE :", overall_mae)
 
+# ==========================================
+# SAVE SUBMISSION
+# ==========================================
 submission = pd.DataFrame({
     "ENCOUNTER_KEY": test_ids,
     "ADMIT_LOS": test_pred
